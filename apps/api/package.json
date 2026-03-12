@@ -1,0 +1,13 @@
+{
+  "name": "@diagram-db/api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "scripts": {
+    "dev": "bun src/server.js",
+    "dev:node": "node src/server.js",
+    "test": "node --test"
+  }
+}

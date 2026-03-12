@@ -1,0 +1,299 @@
+Para desenvolver uma ferramenta como o **DrawSQL** focada exclusivamente em **PostgreSQL**, você precisará de uma stack que lide bem com manipulação de estados complexos (o diagrama) e uma lógica rigorosa de tradução de objetos para SQL.
+
+Aqui está a recomendação de uma tech stack moderna e robusta para esse projeto:
+
+---
+
+## 1. Frontend: O Coração do Diagrama
+
+Para a interface de arrastar e soltar (canvas), você não deve tentar construir tudo do zero com Canvas API pura ou SVG puro, a menos que queira um trabalho hercúleo.
+
+* **Framework:** **React** (Sua escolha base).
+* **Canvas Engine:** **[React Flow](https://reactflow.dev/)**.
+* *Por que:* É a biblioteca líder para fluxogramas e diagramas em React. Ela já resolve o item 5 (caixas flutuantes, conexões via arrows, zoom, pan). Ela permite criar "Custom Nodes", onde você desenhará suas tabelas com campos, tipos e ícones de chaves.
+
+
+* **Gerenciamento de Estado:** **Zustand**.
+* *Por que:* É muito mais leve que Redux e funciona perfeitamente com o React Flow para sincronizar a posição das tabelas e a lista de colunas em tempo real.
+
+
+* **Estilização:** **Tailwind CSS**.
+* **Componentes de UI:** **Radix UI** ou **Shadcn/UI** (para modais de edição de colunas, selects de tipos de dados e menus de contexto).
+
+## 2. Backend: Processamento e Persistência
+
+Como o foco é "Local/Single-User", você tem duas rotas: um servidor Node separado ou uma abordagem Fullstack.
+
+* **Runtime:** **Bun js**.
+* **Framework:** **Next.js (App Router)**.
+* *Por que:* Você consegue manter o Backend e Frontend no mesmo repositório. As API Routes do Next podem lidar com a persistência local.
+
+
+* **Banco de Dados (Interno):** **Drizzle ORM**.
+* *Nota:* Mesmo que a ferramenta desenhe para PostgreSQLuse o próprio PostgreSQL via Docker.
+
+** docker-compose para as necesisdades do projeto
+
+## 3. Lógica Específica (PostgreSQL & SQL Export)
+
+Para atender aos requisitos 2, 3 e 4, você precisará de uma camada de lógica pura (TypeScript):
+
+* **Validador de Tipos PG:** Crie um dicionário estático contendo todos os tipos nativos do Postgres (`uuid`, `varchar`, `jsonb`, `int4`, `timestamp`, etc.) para popular seus selects no frontend.
+* **SQL Generator Engine:** Você precisará criar uma classe ou serviço que:
+1. Varra o array de "Nodes" (Tabelas) do React Flow.
+2. Varra os "Edges" (Relacionamentos) para identificar Foreign Keys.
+3. Gere strings: `CREATE TYPE ... AS ENUM`, `CREATE TABLE ...`, `ALTER TABLE ... ADD CONSTRAINT`.
+
+
+* **Biblioteca Útil:** `sql-formatter` para entregar um arquivo `.sql` bonito e legível para o usuário no botão de exportar.
+
+---
+
+### Arquitetura Sugerida do Diagrama
+
+### Como implementar os requisitos críticos:
+
+* **Relacionamentos (Item 4 e 5):** No React Flow, os "Edges" (linhas) podem carregar metadados. Você pode definir no estado se aquela linha é `1:n` ou `n:n` e usar **MarkerEnds** customizados para desenhar os símbolos de "Pé de Galinha" (Crow's Foot notation) ou setas específicas.
+* **Indexes e Enums (Item 2):** Crie um modal específico para "Global Definitions". O usuário define os Enums lá, e eles passam a aparecer como "Types" selecionáveis nas colunas das tabelas.
+* **Anotações (Item 6):** O React Flow permite diferentes tipos de Nodes. Você pode ter um `TableNode` e um `StickyNoteNode`. O seu motor de exportação SQL simplesmente ignora qualquer node do tipo `StickyNoteNode` na hora de gerar o código.
+
+---
+
+### Resumo da Stack
+
+| Camada | Tecnologia |
+| --- | --- |
+| **Frontend** | React + TypeScript |
+| **Canvas/Diagrama** | **React Flow** (Essencial) |
+| **Estado** | Zustand |
+| **Estilos** | Tailwind CSS + Shadcn/UI |
+| **Backend/API** | Next.js API Routes | Runtime Bun 
+| **Persistência Local** | SQLite (via Prisma) ou LocalStorage (para MVP) |
+| **Exportação** | Lógica customizada em TS + `blob` para download do `.sql` |
+
+
+
+Para construir uma ferramenta robusta, a estrutura de dados (o seu "Single Source of Truth") deve ser independente da visualização, mas compatível com o React Flow.
+
+Aqui está uma proposta de estrutura JSON que suporta tipos do Postgres, relacionamentos complexos e as anotações que não entram no SQL:
+1. Estrutura dos Nodes (Tabelas e Notas)
+
+Cada objeto no array de nodes do React Flow terá um campo data onde guardaremos as definições de banco de dados.
+
+{
+  "nodes": [
+    {
+      "id": "tbl-users",
+      "type": "tableNode", // Tipo customizado para renderizar a tabela
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "tableName": "users",
+        "columns": [
+          {
+            "id": "col-1",
+            "name": "id",
+            "type": "uuid",
+            "isPrimary": true,
+            "isUnique": true,
+            "notNull": true,
+            "default": "gen_random_uuid()"
+          },
+          {
+            "id": "col-2",
+            "name": "email",
+            "type": "varchar",
+            "length": 255,
+            "isUnique": true,
+            "notNull": true
+          },
+          {
+            "id": "col-3",
+            "name": "status",
+            "type": "user_status", // Exemplo de ENUM customizado
+            "isEnum": true
+          }
+        ],
+        "indices": [
+          { "name": "idx_users_email", "columns": ["email"], "unique": true }
+        ]
+      }
+    },
+    {
+      "id": "note-1",
+      "type": "annotationNode", // Tipo customizado para anotações
+      "position": { "x": 400, "y": 50 },
+      "data": {
+        "content": "TODO: Adicionar criptografia na coluna de senha",
+        "color": "#fff9c4"
+      }
+    }
+  ]
+}
+
+2. Estrutura dos Edges (Relacionamentos)
+
+Os edges conectam as tabelas. No PostgreSQL, isso representa as Foreign Keys.
+
+{
+  "edges": [
+    {
+      "id": "rel-users-posts",
+      "source": "tbl-users",
+      "target": "tbl-posts",
+      "sourceHandle": "col-1", // ID da coluna PK em users
+      "targetHandle": "col-user-id", // ID da coluna FK em posts
+      "data": {
+        "relationship": "1:n", // 1 para muitos
+        "onUpdate": "CASCADE",
+        "onDelete": "SET NULL",
+        "label": "has many"
+      },
+      "markerEnd": { "type": "arrowclosed" } // Customizável para símbolos ERD
+    }
+  ]
+}
+
+3. Definições Globais (Enums e Tipos)
+
+Para o requisito de Enums, é ideal ter um objeto separado que o gerador de SQL consultará primeiro.
+
+{
+  "databaseConfig": {
+    "enums": [
+      {
+        "name": "user_status",
+        "values": ["active", "inactive", "banned"]
+      }
+    ]
+  }
+}
+
+
+Este documento serve como o **Guia de Arquitetura e Implementação** para o seu projeto de modelagem de dados PostgreSQL. Ele consolida as decisões técnicas tomadas até agora, garantindo uma base sólida para o desenvolvimento com **React**, **Bun** e **Docker**.
+
+---
+
+## 1. Visão Geral da Arquitetura
+
+O projeto será dividido em um ambiente de micro-serviços via Docker, garantindo que o seu ambiente local de desenvolvimento seja idêntico à execução final.
+
+* **Frontend:** React (Vite/Next.js) rodando sobre Bun.
+* **Canvas Engine:** React Flow para a manipulação visual.
+* **Backend:** Bun (usando `Bun.serve` ou Hono) para persistência e lógica de exportação.
+* **Internal DB:** PostgreSQL (para salvar seus diagramas, usuários e configurações).
+* **Export Target:** PostgreSQL (o dialeto focado para geração do arquivo `.sql`).
+
+---
+
+## 2. Setup do Ambiente (Docker & Bun)
+
+Crie um arquivo `docker-compose.yml` na raiz do projeto para orquestrar os containers.
+
+### `docker-compose.yml`
+
+```yaml
+services:
+  app:
+    image: oven/bun:1-alpine
+    container_name: draw_pg_app
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    command: bun run dev
+    environment:
+      - DATABASE_URL=postgresql://admin:password@db:5432/diagram_db
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    container_name: draw_pg_db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=diagram_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+```
+
+---
+
+## 3. Estrutura de Dados (O "Contrato" JSON)
+
+Para que o React Flow e o motor de exportação SQL se comuniquem, usaremos uma estrutura de objeto único.
+
+### Esquema do Node (Tabela)
+
+```json
+{
+  "id": "uuid-v4",
+  "type": "tableNode",
+  "data": {
+    "name": "orders",
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "isPK": true,
+        "default": "uuid_generate_v4()"
+      },
+      { "name": "total", "type": "decimal", "precision": "10,2" }
+    ],
+    "indices": [{ "name": "idx_total", "columns": ["total"] }]
+  }
+}
+
+```
+
+### Esquema do Edge (Relacionamento)
+
+Os Edges conectam os `handles` das colunas. O tipo de relacionamento (1:N, N:N) é definido nos metadados do edge.
+
+* **Requisito 4:** Para relacionamentos **Muitos-para-Muitos**, a interface deve sugerir a criação de uma tabela intermediária ou gerar o SQL correspondente.
+
+---
+
+## 4. Dicas de Banco de Dados (Interno vs. Exportado)
+
+Como você optou por **PostgreSQL** em vez de SQLite para a persistência interna:
+
+* **Armazenamento de Diagramas:** Utilize o tipo de dado `JSONB` no Postgres interno para salvar o estado completo do React Flow. Isso permite consultas rápidas e flexibilidade para adicionar novos campos sem migrações complexas.
+* **Tipagem Estrita:** No frontend, crie um "Schema de Tipos" que valide se o usuário está inserindo tipos válidos do PG (ex: `int4`, `text`, `jsonb`, `timestamptz`).
+* **Enum Handling:** Os Enums devem ser tratados como objetos globais no seu JSON para que o gerador de SQL os declare no topo do arquivo exportado.
+
+---
+
+## 5. Lógica de Exportação SQL (Requisito 3)
+
+O botão de exportação deve executar um script que realiza o seguinte fluxo:
+
+1. **Sanitização:** Remove nodes do tipo `annotationNode` (Requisito 6).
+2. **Ordenação de Dependência:** Analisa os edges para garantir que as tabelas "Pai" sejam criadas antes das tabelas "Filho" (ou gera todos os `ALTER TABLE` ao final).
+3. **Geração de DDL:**
+* `CREATE TYPE` para os Enums.
+* `CREATE TABLE` com colunas e tipos.
+* `CREATE INDEX` para otimização.
+* `ALTER TABLE ADD CONSTRAINT` para Foreign Keys.
+
+
+
+---
+
+## 6. Próximos Passos Recomendados
+
+Para iniciar o desenvolvimento, siga esta ordem:
+
+1. **Init:** `bun init` e configure o `docker-compose`.
+2. **UI Base:** Instale o **React Flow** e crie o componente de `TableNode` que suporte a adição dinâmica de colunas.
+3. **State Management:** Configure o **Zustand** para gerenciar o array de nodes e edges globalmente.
+4. **Backend Sync:** Crie uma rota `POST /save` no Bun para persistir o JSON no Postgres interno.
+
+**Gostaria que eu escrevesse o código inicial do servidor em Bun usando o driver nativo `bun:sqlite` (ou o driver de Postgres) para salvar e carregar os diagramas?**

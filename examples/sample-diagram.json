@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "tbl-users",
+      "type": "tableNode",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "tableName": "users",
+        "columns": [
+          {
+            "id": "col-users-id",
+            "name": "id",
+            "type": "uuid",
+            "isPrimary": true,
+            "notNull": true,
+            "default": "gen_random_uuid()"
+          },
+          {
+            "id": "col-users-email",
+            "name": "email",
+            "type": "varchar",
+            "length": 255,
+            "isUnique": true,
+            "notNull": true
+          },
+          {
+            "id": "col-users-status",
+            "name": "status",
+            "type": "user_status",
+            "isEnum": true,
+            "notNull": true
+          }
+        ],
+        "indices": [{ "name": "idx_users_email", "columns": ["email"], "unique": true }]
+      }
+    },
+    {
+      "id": "tbl-posts",
+      "type": "tableNode",
+      "position": { "x": 400, "y": 100 },
+      "data": {
+        "tableName": "posts",
+        "columns": [
+          { "id": "col-posts-id", "name": "id", "type": "uuid", "isPrimary": true, "notNull": true },
+          { "id": "col-posts-user-id", "name": "user_id", "type": "uuid", "notNull": true },
+          { "id": "col-posts-title", "name": "title", "type": "text", "notNull": true }
+        ]
+      }
+    },
+    {
+      "id": "note-1",
+      "type": "annotationNode",
+      "position": { "x": 250, "y": 20 },
+      "data": { "content": "Esse node é ignorado no SQL" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "rel-users-posts",
+      "source": "tbl-users",
+      "target": "tbl-posts",
+      "sourceHandle": "col-users-id",
+      "targetHandle": "col-posts-user-id",
+      "data": { "relationship": "1:n", "onUpdate": "CASCADE", "onDelete": "CASCADE" }
+    }
+  ],
+  "databaseConfig": {
+    "enums": [{ "name": "user_status", "values": ["active", "inactive", "banned"] }]
+  }
+}
+

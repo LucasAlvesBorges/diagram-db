@@ -1,0 +1,15 @@
+{
+  "name": "diagram-db",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun apps/api/src/server.js",
+    "dev:node": "node apps/api/src/server.js",
+    "dev:web": "npm --workspace apps/web run dev",
+    "test": "node --test"
+  }
+}
