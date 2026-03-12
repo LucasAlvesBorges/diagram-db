@@ -52,7 +52,7 @@ npm install
 
 ### Option A — Docker (recommended)
 
-Sobe API + frontend + PostgreSQL com um comando:
+Spins up the API + frontend + PostgreSQL with a single command:
 
 ```bash
 docker compose up --build
@@ -64,7 +64,7 @@ docker compose up --build
 | API | `http://localhost:3000` |
 | PostgreSQL | `localhost:5433` (user: `admin`, password: `password`) |
 
-Para parar:
+To stop:
 
 ```bash
 docker compose down
@@ -72,17 +72,17 @@ docker compose down
 
 ### Option B — Local (without Docker)
 
-Abra dois terminais:
+Open two terminals:
 
 ```bash
-# Terminal 1 — API (file storage por padrão)
+# Terminal 1 — API (file storage by default)
 npm run dev:node
 
 # Terminal 2 — Frontend
 npm run dev:web
 ```
 
-Para usar PostgreSQL local em vez de file storage:
+To use a local PostgreSQL instead of file storage:
 
 ```bash
 DATABASE_URL="postgresql://user:pass@localhost:5432/diagram_db" npm run dev:node
