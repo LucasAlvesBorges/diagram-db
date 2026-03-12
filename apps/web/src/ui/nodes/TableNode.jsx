@@ -5,6 +5,38 @@ import { DJANGO_FIELD_TYPES } from "@diagram-db/shared/postgres";
 import { useDiagramStore } from "../../store/diagramStore.js";
 import { TABLE_COLORS, DEFAULT_TABLE_COLOR } from "../tableColors.js";
 
+function IconTrash() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12" />
+      <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
+      <path d="M13 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1V4" />
+      <line x1="6.5" y1="7" x2="6.5" y2="12" />
+      <line x1="9.5" y1="7" x2="9.5" y2="12" />
+    </svg>
+  );
+}
+
+function ConfirmDeleteModal({ tableName, onConfirm, onCancel }) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <p className="modal-text">
+          Tem certeza que deseja deletar a tabela <strong>{tableName}</strong>?
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="modal-btn cancel" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button type="button" className="modal-btn confirm" onClick={onConfirm}>
+            Deletar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function asString(value) {
   return typeof value === "string" ? value : "";
 }
@@ -25,9 +57,11 @@ export function TableNode({ id, data }) {
   const updateColumn = useDiagramStore((s) => s.updateColumn);
   const addColumn = useDiagramStore((s) => s.addColumn);
   const removeColumn = useDiagramStore((s) => s.removeColumn);
+  const removeTable = useDiagramStore((s) => s.removeTable);
   const databaseConfig = useDiagramStore((s) => s.databaseConfig);
 
   const [showColors, setShowColors] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const name = asString(data?.tableName ?? data?.name ?? "table");
   const columns = Array.isArray(data?.columns) ? data.columns : [];
@@ -71,6 +105,14 @@ export function TableNode({ id, data }) {
           style={{ background: headerColor }}
           onClick={() => setShowColors(!showColors)}
         />
+        <button
+          type="button"
+          className="nodrag node-delete-btn"
+          title="Excluir tabela"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          <IconTrash />
+        </button>
       </div>
 
       {showColors && (
@@ -137,6 +179,14 @@ export function TableNode({ id, data }) {
           + Coluna
         </button>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDeleteModal
+          tableName={name}
+          onConfirm={() => removeTable(id)}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }

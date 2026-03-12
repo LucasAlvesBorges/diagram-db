@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactFlow, { addEdge, applyEdgeChanges, applyNodeChanges, Background, Controls, MiniMap } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -62,6 +62,14 @@ function IconSave() {
   );
 }
 
+function IconFolder() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4v8a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3H3a1 1 0 00-1 1z" />
+    </svg>
+  );
+}
+
 /* ── Helpers ───────────────────────────────────── */
 
 function download(filename, content) {
@@ -106,6 +114,7 @@ export function App() {
   const updateAnnotationContent = useDiagramStore((s) => s.updateAnnotationContent);
   const updateEdgeData = useDiagramStore((s) => s.updateEdgeData);
   const removeEdge = useDiagramStore((s) => s.removeEdge);
+  const loadDiagram = useDiagramStore((s) => s.loadDiagram);
 
   const nodeTypes = useMemo(() => ({ tableNode: TableNode, annotationNode: AnnotationNode }), []);
 
@@ -114,6 +123,53 @@ export function App() {
   const [sqlPreview, setSqlPreview] = useState("");
   const [showSqlPanel, setShowSqlPanel] = useState(false);
   const [issues, setIssues] = useState({ errors: [], warnings: [] });
+  const [showProjects, setShowProjects] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState(null);
+
+  async function fetchProjects() {
+    setLoadingProjects(true);
+    try {
+      const res = await fetch("/projects");
+      if (!res.ok) return;
+      const data = await res.json();
+      setProjects(Array.isArray(data.projects) ? data.projects : []);
+    } catch { /* API offline */ }
+    setLoadingProjects(false);
+  }
+
+  async function onLoadProject(projectId) {
+    try {
+      const res = await fetch(`/projects/${projectId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.project?.diagram) {
+        loadDiagram(data.project.diagram);
+        setCurrentProjectId(projectId);
+        setShowProjects(false);
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function onDeleteProject(projectId) {
+    try {
+      const res = await fetch(`/projects/${projectId}`, { method: "DELETE" });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        if (currentProjectId === projectId) {
+          loadDiagram({ nodes: [], edges: [], databaseConfig: { enums: [] } });
+          setCurrentProjectId(null);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("project");
+    if (pid) { setCurrentProjectId(pid); onLoadProject(pid); }
+  }, []);
 
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((e) => e.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
@@ -182,6 +238,12 @@ export function App() {
           <span className="toolbar-name">Diagram DB</span>
         </div>
 
+        <div className="toolbar-group">
+          <button className="toolbar-btn" onClick={() => { setShowProjects(!showProjects); if (!showProjects) fetchProjects(); }}>
+            <IconFolder /> Projetos
+          </button>
+        </div>
+
         <div className="toolbar-spacer" />
 
         <div className="toolbar-group">
@@ -245,6 +307,50 @@ export function App() {
             />
           </ReactFlow>
         </div>
+
+        {/* ── Projects Panel ── */}
+        {showProjects && (
+          <div className="projects-panel">
+            <div className="panel-header">
+              <span className="panel-title">Projetos</span>
+              <button className="panel-close" onClick={() => setShowProjects(false)}>
+                &#215;
+              </button>
+            </div>
+            <div className="panel-body">
+              {loadingProjects && <p className="muted">Carregando...</p>}
+              {!loadingProjects && projects.length === 0 && (
+                <p className="muted">Nenhum projeto salvo. Use o MCP ou o botão Salvar.</p>
+              )}
+              {projects.map((p) => (
+                <div key={p.id} className="project-item">
+                  <button
+                    type="button"
+                    className="project-item-load"
+                    onClick={() => onLoadProject(p.id)}
+                  >
+                    <span className="project-item-name">{p.name}</span>
+                    <span className="project-item-date">
+                      {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("pt-BR") : ""}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="project-item-delete"
+                    title="Excluir projeto"
+                    onClick={() => onDeleteProject(p.id)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 4h12" />
+                      <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
+                      <path d="M13 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1V4" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Edge Editor Panel ── */}
         {selectedEdge && (

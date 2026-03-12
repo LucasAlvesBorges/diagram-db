@@ -137,6 +137,13 @@ export const useDiagramStore = create((set, get) => ({
     get().setNodes(nodes);
   },
 
+  removeTable: (nodeId) => {
+    const nodes = get().nodes.filter((n) => n.id !== nodeId);
+    const edges = get().edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+    set({ nodes, edges });
+    persistDiagram({ nodes, edges, databaseConfig: get().databaseConfig });
+  },
+
   addAnnotation: () => {
     const id = crypto.randomUUID();
     const node = {
@@ -168,6 +175,14 @@ export const useDiagramStore = create((set, get) => ({
   removeEdge: (edgeId) => {
     const edges = get().edges.filter((e) => e.id !== edgeId);
     get().setEdges(edges);
+  },
+
+  loadDiagram: (diagram) => {
+    const nodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
+    const edges = Array.isArray(diagram?.edges) ? diagram.edges : [];
+    const databaseConfig = diagram?.databaseConfig ?? { enums: [] };
+    set({ nodes, edges, databaseConfig });
+    persistDiagram({ nodes, edges, databaseConfig });
   },
 
   addEnum: () => {

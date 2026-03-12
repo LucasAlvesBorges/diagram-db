@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "diagram-db": {
+      "command": "node",
+      "args": ["packages/mcp-server/src/index.js"],
+      "env": {
+        "STORAGE": "postgres",
+        "DATABASE_URL": "postgresql://admin:password@127.0.0.1:5433/diagram_db"
+      }
+    }
+  }
+}

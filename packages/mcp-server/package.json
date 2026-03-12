@@ -1,0 +1,12 @@
+{
+  "name": "@diagram-db/mcp-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "diagram-db-mcp": "./src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}
